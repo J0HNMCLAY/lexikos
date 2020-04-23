@@ -79,7 +79,5 @@ UC = list( string.ascii_uppercase )
 LC = list( string.ascii_lowercase )
 WORD_LIST = [['' for i in range(1)] for j in range(27)]
 
-if __name__ == '__main__':
-    pass
-    Main()
+if __name__ == '__main__': Main()
 
