@@ -14,8 +14,8 @@ $log = console.log;
 //let dictionaryURL = 'https://en.wiktionary.org/wiki/';
 let dictionaryURL = 'https://www.dictionary.com/browse/';
 //let wordURL       = 'lexicon';
-let wordURL       = 'edible';
 //let wordURL       = 'edible';
+let wordURL       = 'wolf';
 let url = dictionaryURL + wordURL;
 
 
@@ -42,6 +42,21 @@ axios.get( url ).then( (response) =>
      * Below are bools we check off once we've retrived the data (dictionary.com)
      * sometimes has duplicate sections from US & British dictionarys!
      */
+    var GOT_pronunciation = false;
+    var GOT_defintions    = false;
+
+    // --- PRONUNCIATION ---
+    let headWord = $('section .entry-headword').html();
+    LEX_Parse_Pronunciation( headWord );
+
+
+    // --- DEFINITIONS ---
+    //-Get the ordered list of Definitions
+    let definitions = $('section').html();
+    LEX_Parse_Definitions( definitions );
+    return
+
+    //
     let Pronunciations_Collected = false;
     let Definitions_Collected    = false;
 
@@ -83,7 +98,7 @@ axios.get( url ).then( (response) =>
                 //-If the next section is the "Origin of "//////
                 // then we're finished collecting definitions///
                 let originOf_check =  nextSection('h2').text();
-                $log(`Origin of check::${originOf_check}`);
+                $log(`---Origin of check::${originOf_check}---`);
                 if( originOf_check.startsWith("Origin of ") ) 
                 {
 
@@ -107,15 +122,20 @@ axios.get( url ).then( (response) =>
                         //-Synonyms for...(brief list)
                         if( _headerText.startsWith('synonyms') )
                         {
-                            let _synonyms = $(el).next().text();
-                            $log(`Synonyms::${_synonyms}`);
-                            //LEX_Parse_WordOrigin( _wordOrigin );
+                            let _synonyms = $(el).next().html();
+                            LEX_Parse_Synonyms( _synonyms );
+                        }
+
+                        //-Other words from
+                        if( _headerText.startsWith("other words from ") )
+                        {
+                            let _otherWordsFrom = $(el).next().html();
+                            LEX_Parse_OtherWordsFrom(_otherWordsFrom);
                         }
 
 
 
                     })
-
 
                     //-Finish up Definitions!
                     Getting_Definintions = false;
@@ -176,68 +196,71 @@ axios.get( url ).then( (response) =>
 
                 // --- DEFINITIONS ---
                 //-Get the ordered list of Definitions
-                let _definitions = nextSection('div').children('div');
+                let _definitions = nextSection('section').html();
                 $log(`Definition Elements::${_definitions.length}`);
 
-                for (let i = 0; i < _definitions.length; i++) 
-                {
+                LEX_Parse_Definitions( _definitions );
+                return
 
-                    // DEFINITION with EXAMPLE
-                    let _exampledDefinition_E = $( _definitions[i] ).find('.luna-example');
-                    if( _exampledDefinition_E.length )
-                    {
-                        let _exampleText = _exampledDefinition_E.text();
+                // for (let i = 0; i < _definitions.length; i++) 
+                // {
 
-                        let _exampleDefinition = $( _exampledDefinition_E ).parent().text().split(':')[0];
-                        $log(`>Example Definition::${ _exampleDefinition }`);
-                        $log(`>Example Text::${ _exampleText }`);
+                //     // DEFINITION with EXAMPLE
+                //     let _exampledDefinition_E = $( _definitions[i] ).find('.luna-example');
+                //     if( _exampledDefinition_E.length )
+                //     {
+                //         let _exampleText = _exampledDefinition_E.text();
 
-                        //-Setup Definition Object
-                        var DEFINTION = new WordClass.Definition();
-                        DEFINTION.Definitions.push( _exampleDefinition.toString() );
-                        DEFINTION.Example.push( _exampleText.toString() );
-                        //+++Add to our WordClass Object
-                        WORD_CLASS.Definition.push( DEFINTION );
-                        continue;
-                    }
+                //         let _exampleDefinition = $( _exampledDefinition_E ).parent().text().split(':')[0];
+                //         $log(`>Example Definition::${ _exampleDefinition }`);
+                //         $log(`>Example Text::${ _exampleText }`);
 
-                    // CONTEXTUAL DEFINITIONS
-                    let _contextualDefinition_E = $( _definitions[i] ).find('.luna-label');
-                    let _contextualDefinition = _contextualDefinition_E.text();
-                    if( _contextualDefinition!='' )
-                    {
-                        var DEFINTION = new WordClass.Definition();
-                        DEFINTION.Context = _contextualDefinition.toString();
+                //         //-Setup Definition Object
+                //         var DEFINTION = new WordClass.Definition();
+                //         DEFINTION.Definitions.push( _exampleDefinition.toString() );
+                //         DEFINTION.Example.push( _exampleText.toString() );
+                //         //+++Add to our WordClass Object
+                //         WORD_CLASS.Definition.push( DEFINTION );
+                //         continue;
+                //     }
 
-                        //-Get contentual definitions
-                        let _cDefinitions = $( _definitions[i] ).find('ol').text().split('.');
-                            $log(`>Contextual Definition Header::${ DEFINTION.Context }`);
-                        _cDefinitions.forEach((cd) => {
-                            if( cd.trim()!='' ) {
-                                DEFINTION.Definitions.push( cd.toString() );
-                                $log(`>Contextual Definitions::${cd}`);
-                            }
-                        });
+                //     // CONTEXTUAL DEFINITIONS
+                //     let _contextualDefinition_E = $( _definitions[i] ).find('.luna-label');
+                //     let _contextualDefinition = _contextualDefinition_E.text();
+                //     if( _contextualDefinition!='' )
+                //     {
+                //         var DEFINTION = new WordClass.Definition();
+                //         DEFINTION.Context = _contextualDefinition.toString();
 
-                        //+++Add to our WordClass Object
-                        WORD_CLASS.Definition.push( DEFINTION );
-                        continue;
-                    }
+                //         //-Get contentual definitions
+                //         let _cDefinitions = $( _definitions[i] ).find('ol').text().split('.');
+                //             $log(`>Contextual Definition Header::${ DEFINTION.Context }`);
+                //         _cDefinitions.forEach((cd) => {
+                //             if( cd.trim()!='' ) {
+                //                 DEFINTION.Definitions.push( cd.toString() );
+                //                 $log(`>Contextual Definitions::${cd}`);
+                //             }
+                //         });
+
+                //         //+++Add to our WordClass Object
+                //         WORD_CLASS.Definition.push( DEFINTION );
+                //         continue;
+                //     }
                     
-                    // REGULAR DEFINITION
-                    let _Definition = $( _definitions[i] ).text();
-                    $log(`>Regular Definition::${ _Definition }`);
+                //     // REGULAR DEFINITION
+                //     let _Definition = $( _definitions[i] ).text();
+                //     $log(`>Regular Definition::${ _Definition }`);
 
-                    //-Setup Definition Object
-                    var DEFINTION = new WordClass.Definition();
-                    DEFINTION.Definitions.push( _Definition.toString() );
-                    //+++Add to our WordClass Object
-                    WORD_CLASS.Definition.push( DEFINTION );
-                    continue;
-                }
+                //     //-Setup Definition Object
+                //     var DEFINTION = new WordClass.Definition();
+                //     DEFINTION.Definitions.push( _Definition.toString() );
+                //     //+++Add to our WordClass Object
+                //     WORD_CLASS.Definition.push( DEFINTION );
+                //     continue;
+                // }
 
-                //+++Add WORD_CLASS
-                WORD.Definitions.push( WORD_CLASS );
+                // //+++Add WORD_CLASS
+                // WORD.Definitions.push( WORD_CLASS );
 
             }
         }
@@ -256,26 +279,100 @@ axios.get( url ).then( (response) =>
  * DICTIONARY.COM PARSING METHODS
  */
 
+function LEX_Parse_Definitions (_definitions)
+{
+    //-Definiiton class
+    let definitonClass = 'css-pnw38j';
+
+    //-Load via Cheerio
+    let $ = cheerio.load( _definitions );
+
+    $log('___DEFINITIONS HTML___');
+    //$log($.html())
+
+    $('section').each( (i,e) => 
+    {
+        if( $(e).hasClass(definitonClass) )
+        {
+            let defintion = cheerio.load( $(e).html() );
+
+            let wordClass = defintion('.luna-pos').text()
+            $log(`->Word Class::${wordClass}` );
+
+            let grammatical_category = defintion('.luna-grammatical-category').text();
+            $log(`->Grammatical Category::${grammatical_category}` );
+
+            let inflected_form = defintion('.luna-inflected-form').text();
+            $log(`->Inflected Form::${inflected_form}` );
+
+            let inflected_pron = defintion('.pron-spell').text();
+            $log(`->Inflected Pronunciation::${inflected_pron}` );
+
+
+            defintion('div[value]').each( (i, e) =>
+            {
+                let defNo = $(e).attr('value');
+                if( defNo != undefined )
+                {
+                    let definition = $(e).text();
+
+                    //-Check for definition with EXAMPLE
+                    let def = cheerio.load( $(e).html() );
+
+                    let example = def('.luna-example').text();
+                    if( example!='' ) {
+                        definition = def('.luna-example').parent().text().split(':')[0];
+                        $log(`Example-Def::${definition}`)
+                        $log(`Example::${example}`)
+                    }
+
+                    //-Contextual definitions ('Ordered-List' pre-supposes contextual definitions...)
+                    //let context = def('ol').html();
+                    let context = def('.luna-label').html(); //$log(`Context::${context}`)
+                    if( context!=null ) {
+                        context = def('.luna-label').parent().text();
+                        $log(`Context::${context}`)
+
+                        definition = [];
+                        let singularDefinition = $(e).text().split('.')[1];
+                        $log(`->Contextual Singular--definition::${singularDefinition}`);
+
+                        def('li').each( (index, sDef) => 
+                        {
+                            let d = $(sDef).text();
+                            definition.push( d.toString() );
+                            $log(`Contextual Subdefinition::${d}`);
+                        })
+                            
+                        //$log(`Context::${context}`)
+                    }
+
+                    $log(`>>Definition ${defNo}::${ definition }` );
+                }
+            });
+
+            // DEBUG
+            $log(`\nSection Index::${i}`);
+        }
+    });
+
+}
+
 /**
  * Parse the pronunciation for the word!
  * @param {string} _pronunciation Parsed string...may be empty!
  */
 function LEX_Parse_Pronunciation (_pronunciation)
 {
-    let collected = false;
+    //-Load via Cheerio
+    let $ = cheerio.load( _pronunciation );
 
-    if (_pronunciation != '') 
-    {
-        WORD.Pronunciation = _pronunciation;
-        collected=true;
+    // $log('___PRONUNCIATION HTML___');
+    // $log($.html())
 
-        /*DEBUG*/ 
-        $log("Pronunciation..." + WORD.Pronunciation)
-    }
+    let pronunciation = $('.pron-spell-content').text();
+    $log(`>>Pronunciation::${ pronunciation }` );
 
-    if(!collected ) $log(` :( -> Pronunciation for ${WORD.Capitalised()} not found... `);
-
-    return collected;
 }
 
 
@@ -296,14 +393,67 @@ function LEX_Parse_WordOrigin (_origin)
 
 }
 
-
+/**
+ * 
+ * @param {Object} _synonyms HTML Element containing synonyms
+ */
 function LEX_Parse_Synonyms (_synonyms)
 {
-    //-Brief parse...
+
+    //-Prime Synonym array
+    let Synonyms = [];
+
+
+    //-Load via Cheerio
+    let $ = cheerio.load( _synonyms );
+    //-Break into its HTML 
+    let _synonyms_E = $( _synonyms ).html();
+    //-Iterate over each element
+    $( _synonyms_E ).each( (i, el) =>
+    {
+        let text = '';
+        if( $(el).hasClass('luna-xref') ) { //<-- class identified as actually containing synonyms
+            text = $(el).text();
+            Synonyms.push( text.toString() );
+            //$log(`Synonym::${text}`);
+        }
+    });
 
     //-Set WORD Object
     WORD.Synonyms = new WordClass.Synonyms();
-    WORD.Synonyms.BriefList.push( _synonyms );
+    WORD.Synonyms.BriefList = Synonyms.concat( WORD.Synonyms.BriefList );
+
+    // DEBUG
+    $log(`Synonyms [Brief List]::${WORD.Synonyms.BriefList}`);
+}
+
+
+function LEX_Parse_OtherWordsFrom (_otherWords)
+{
+
+    let Related_Forms = [];
+
+        //-Load via Cheerio
+        let $ = cheerio.load( _otherWords );
+        //-Break into its HTML 
+        let _otherWords_E = $( _otherWords ).html();
+        //-Iterate over each element
+        $( _otherWords_E ).each( (i, el) =>
+        {
+            let _subElements = $(el).html();
+            $( _subElements ).each( (i, subE) => 
+            {
+                let text = ''
+                if( $(subE).hasClass('luna-runon') ) {
+                    text = $(subE).text().replace(/·/g, '');
+                    Related_Forms.push( text );
+                    //$log(`Related F::${text}`);
+                }
+            });
+
+        });
+
+
 }
 
 
