@@ -39,7 +39,7 @@ exports.Definition = class {
     {
         this.Context     = "";
         this.Definitions = [];
-        this.Example     = [];
+        this.Examples    = [];
     }
 }
 

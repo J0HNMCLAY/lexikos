@@ -57,11 +57,29 @@ def Get_Letter_Stats():
         output = 'Letter::{letter} - {entries} entries | Size::{size:.2f} KB'.format(letter=item, entries=len(wordList), size=(fileSize/1024) )
         print( output )
 
+def Find_Word(_word):
+    '''Check if a word exists in the .json dictionary'''
+    initial = _word[0].upper()
+    fileName = initial + '.json';
+    #
+    found = False
+    word = _word.lower()
+    #
+    with open(WORDS_WIP_DIR+fileName, 'r') as rFile:
+        wordList = json.load(rFile)
+        if word in wordList: 
+            found = True
+            print('Dictionary contains::"{w}" in {jfile}'.format(w=word, jfile=fileName))
+
+    if found is False: print('Dictionary DOES NOT contain::"{w}" in {jfile}'.format(w=word, jfile=fileName))
+    
+
 #--------------------------------------------------------------------#
 #----------------------------- MAIN ---------------------------------#
 def Main():
     pass
-    Get_Letter_Stats()
+    #Get_Letter_Stats()
+    Find_Word('japzzz')
 
 
 
