@@ -66,6 +66,9 @@ let mainLoop = setInterval( () =>
             
             ACTIVE_WORD = word;
             STATE.Set("CHECK_WORD");
+            // DEBUG
+            STATE.Loop++;
+            $log(`State Loop::${STATE.Loop}`);
         });
     }
     if( STATE.Is("CHECK_WORD") )
@@ -74,10 +77,14 @@ let mainLoop = setInterval( () =>
         //
         Check_Word().then( (wordHTML) => 
         {
-            Parse_Word(wordHTML).then( (data) => 
+            Parse_Word(wordHTML).then( (wordList) => 
             {
-
-                clearInterval(mainLoop)
+                Save_WordList(wordList).then( ()=>
+                {
+                    if( STATE.Loop==1000 ) STATE.Set("FINISHED");
+                    else
+                        STATE.Set("GET_WORD"); // <-- Change to Reset!
+                })
             });
 
         }).catch((error)=>
@@ -88,7 +95,7 @@ let mainLoop = setInterval( () =>
             //
             Save_WordList(error).then( ()=>
             {
-                STATE.Set("FINISHED"); // <-- Change to Reset!
+                STATE.Set("GET_WORD"); // <-- Change to Reset!
             })
         })
     }
@@ -126,7 +133,7 @@ function Load_Word ()
 
     $log(`JSON Word Files::${files}`);
 
-    //-If no file
+    //-If no file found...
     if( !files.length ) ACTIVE_WORD = Get_First_Word();
 
     //-Go through files until we find a word that hasn't been checked!
@@ -165,7 +172,8 @@ function Check_Word ()
     return new Promise( (resolve, reject) =>
     {
         // Build our URL
-        let url = dictionaryURL + ACTIVE_WORD.Word;
+        let word = URL_Formatted_Word( ACTIVE_WORD.Word );
+        let url = dictionaryURL + word;
         $log(`Axios URL::${url}`);
 
         //-Create an instance with a longer timeout...
@@ -178,7 +186,7 @@ function Check_Word ()
         // Web Request...
         myAxios.get( url ).then( (response) => 
         {
-            //-If successful: Cheerio the result
+            //-If successful: Cheerio the result into HTML and return
             const $ = cheerio.load( response.data );
             resolve($.html());
             return;
@@ -201,18 +209,19 @@ function Parse_Word (wordHTML)
     {
     const $ = cheerio.load(wordHTML);
 
+    let wordList = [];
+
     //-FOUND
     let headWord_text = $('.entry-headword h1').text()
     if( headWord_text!=null )
     {
         $log(`Headword Found--${headWord_text}!`);
         ACTIVE_WORD.IsValid(headWord_text);
-        //wordList.push(ACTIVE_WORD)
 
         $log(`Elements::${ $('h2').length } `)
 
         //-Pull Nearby Words
-        if ( $('h2').length) 
+        if ( $('h2').length ) 
         {
             $('h2').each((i, e) => 
             {
@@ -244,9 +253,12 @@ function Parse_Word (wordHTML)
                 }
             });
 
-            //
+            //-if the ACTIVE_WORD exists, overwrite it
             let activeWord_index = wordList.findIndex( (e) => {return e.Word==ACTIVE_WORD.Word} ); 
             wordList[activeWord_index] = ACTIVE_WORD;
+            //
+            if( activeWord_index < 0 )
+                wordList.push( ACTIVE_WORD );
 
         }
         else
@@ -255,9 +267,9 @@ function Parse_Word (wordHTML)
         }
     }
 
-        $log('Word List');
-        $log(wordList);
-        resolve()
+        //$log('Word List');
+        //$log(wordList);
+        resolve( wordList );
 
     });
 }
@@ -291,8 +303,10 @@ function Save_WordList(wordList) {
                 let _wordIndex = fileContent.findIndex((e) => { return e.Word == wordList[i].Word });
                 if (_wordIndex != -1) {
                     //-If the word's has NOT been checked...add
-                    if (!fileContent[_wordIndex].Checked)
+                    if ( fileContent[_wordIndex].Checked==false )
+                    {
                         fileContent[_wordIndex] = wordList[i];
+                    }
                 }
                 else {
                     fileContent.push(wordList[i]);
@@ -308,6 +322,8 @@ function Save_WordList(wordList) {
                 fileContent = JSON.stringify(fileContent);
                 //
                 FS.writeFileSync(wordFile, fileContent);
+                // LOG
+                $log(`New word file written::${wordFile} !`);
             }
         }
         resolve();
@@ -315,6 +331,18 @@ function Save_WordList(wordList) {
     });
 
 
+}
+
+/**
+ * 
+ * @param {*} _rawWord 
+ */
+function URL_Formatted_Word(_rawWord)
+{
+    //-Format each non-character into a '-' so the word 
+    // is accepted in a URL
+    let word = _rawWord.replace(/[^a-zA-Z]/g, "-");
+    return word;
 }
 
 /**
