@@ -4,17 +4,19 @@ const axios   = require('axios').default;
 const cheerio = require('cheerio');
 
 //# My Packages
-const WordClass = require('./Word_Class.js');
+const WordClass    = require('./Word_Class.js');
+const StateMachine = require('./State_Machine.js');
+
 
 $log = console.log;
 
-//--- MAIN ---
+//--- MAIN ---------------------------------------------
 
 //-Http Requests
 //let dictionaryURL = 'https://en.wiktionary.org/wiki/';
 let dictionaryURL = 'https://www.dictionary.com/browse/';
-let wordURL       = 'lexicon';
-//let wordURL       = 'edible';
+//let wordURL       = 'lexicon';
+let wordURL       = 'edible';
 //let wordURL         = 'wolf';
 //let wordURL         = 'regular';
 //let wordURL         = 'music';
@@ -26,41 +28,87 @@ var WORD = new WordClass.Word();
 WORD.Word = wordURL;
 
 
+//-StateMachine
+var STATE = new StateMachine.State_Machine();
+STATE.Set("SETUP");
+
+
+
+// ----- MAIN LOOP ----- //
+var mainLoop = setInterval( () =>
+{
+
+    if( STATE.Is("SETUP") )
+    {
+        STATE.Set("DICTIONARY");
+    }
+    if( STATE.Is("DICTIONARY") )
+    {
+        STATE.Set("PROCESSING");
+        //
+        Scrape_Dictionary().then( (data) =>
+        {
+            $log(`Dictionary output::${data}`);
+            STATE.Set("THESAURUS");
+        });
+    }
+    if( STATE.Is("THESAURUS") )
+    {
+
+        $log(`Starting Thesaurus scrape`);
+        clearInterval(mainLoop)
+    }
+
+
+}, 500);
+
+
 /**
  * Scrape from Dictionary.com
  */
-axios.get( url ).then( (response) => 
-{
-    //-DEBUG
-    $log(`Response::${response.status} | Response URL:: ${url}`);
+function Scrape_Dictionary() {
+    return new Promise((resolve, reject) => {
 
-    //-Cheerio the data
-    const $ = cheerio.load(response.data);
-
-    /**
-     * Dictionary.com segments info. via the html <section> tag.
-     * We build our word information by iterating through each section.
-     * 
-     * Below are bools we check off once we've retrived the data (dictionary.com)
-     * sometimes has duplicate sections from US & British dictionarys!
-     */
-
-    // --- PRONUNCIATION ---
-    let headWord = $('section .entry-headword').html();
-    LEX_Parse_Pronunciation( headWord );
+        //-Set the URL
+        let Dictionary_URL = dictionaryURL + wordURL;
 
 
-    // --- DEFINITIONS ---
-    //-Get the ordered list of Definitions
-    let definitions = $('section').html();
-    LEX_Parse_Definitions( definitions );
+        axios.get(Dictionary_URL).then((response) => {
+
+            //-DEBUG
+            $log(`Response::${response.status} | Response URL:: ${url}`);
+
+            //-Cheerio the data
+            const $ = cheerio.load(response.data);
+
+            /**
+             * Dictionary.com segments info. via the html <section> tag.
+             * We build our word information by iterating through each section.
+             * 
+             * Below are bools we check off once we've retrived the data (dictionary.com)
+             * sometimes has duplicate sections from US & British dictionarys!
+             */
+
+            // --- PRONUNCIATION ---
+            let headWord = $('section .entry-headword').html();
+            LEX_Parse_Pronunciation(headWord);
 
 
-    // --- ORIGIN OF ---
-    
-    return
+            // --- DEFINITIONS ---
+            //-Get the ordered list of Definitions
+            let definitions = $('section').html();
+            LEX_Parse_Definitions(definitions);
 
-});
+
+            // --- ORIGIN OF ---
+            // ? maybe
+            resolve("Dictionary scraped!");
+
+        });
+
+    });
+
+}
 
 /**
  * DICTIONARY.COM PARSING METHODS
@@ -90,6 +138,15 @@ function LEX_Parse_Definitions (_definitions)
 
             let wordClass = defintion('.luna-pos').text()
             $log(`->Word Class::${wordClass}` );
+
+            //*NOTE: Dictionary.com has another definition's section (The British section),
+            // which doesn't use the .luna-pos tag.
+            //-So add a condition: if the .luna-pos tag can't be found, skip this section!
+            let wordClassFound = (wordClass.trim()=='') ? false : true;
+            $log(`!!Word Class found::${wordClassFound}`);
+            //wordClassFound=true;
+        if( wordClassFound==true )
+        {
 
             let grammatical_category = defintion('.luna-grammatical-category').text();
             $log(`->Grammatical Category::${grammatical_category}` );
@@ -216,6 +273,8 @@ function LEX_Parse_Definitions (_definitions)
 
             console.table( WORD.Definitions )
         }
+
+    }//|END - Check if we've found a 'word-class' e.g. noun!
     });
 
 }

@@ -81,22 +81,32 @@ let mainLoop = setInterval( () =>
             {
                 Save_WordList(wordList).then( ()=>
                 {
-                    if( STATE.Loop==1000 ) STATE.Set("FINISHED");
+                    if( STATE.Loop==50000 ) STATE.Set("FINISHED");
                     else
                         STATE.Set("GET_WORD"); // <-- Change to Reset!
                 })
             });
 
-        }).catch((error)=>
+        }).catch( (error)=>
         {
             //*Should be the ACTIVE_WORD as an error!
             $log('Check word ERROR::')
             $log(error)
-            //
+            
+            //-Axios processing error...typically bad, and cause for termination!
+            if( typeof(error)=='string' ) {
+                if( error.includes('!Hard Reject!') ) 
+                {
+                    clearInterval(mainLoop)
+                    return;
+                }}
+            
+            //-Save word as erroneous
             Save_WordList(error).then( ()=>
             {
                 STATE.Set("GET_WORD"); // <-- Change to Reset!
-            })
+            });
+
         })
     }
 
@@ -173,6 +183,7 @@ function Check_Word ()
     {
         // Build our URL
         let word = URL_Formatted_Word( ACTIVE_WORD.Word );
+        //let word = 'wooop' //<--TEST
         let url = dictionaryURL + word;
         $log(`Axios URL::${url}`);
 
@@ -193,11 +204,22 @@ function Check_Word ()
 
         }).catch( (error) =>
         {
-            $log(`Axios - ${error}`);
-            //
-            ACTIVE_WORD.Invalid("Word doesn't exist");
-            reject(ACTIVE_WORD)
-            return;
+
+            //-Catch no-internet/site address error
+            if( error.errno!=undefined ) 
+            {
+                reject(`!Hard Reject!::Axios error - ${error}`);
+                return;
+            }
+            else
+            {
+                $log(`Axios - ${error}`);
+                //console.table(error)
+                //
+                ACTIVE_WORD.Invalid("Word doesn't exist");
+                reject(ACTIVE_WORD)
+                return;
+            }
         });
 
     });
