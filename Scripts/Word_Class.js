@@ -8,9 +8,11 @@ exports.Word = class {
     {
         this.Word='';
         this.Pronunciation='';
-        this.Definitions = [];
-        this.Etymology;
-        this.Synonyms;
+        this.Definition_Blocks = [];
+        //
+        this.Synonyms  = [];
+        this.Antonyms  = [];
+        this.Etymology = '';
         //
         this.Off=false; //<-- DEBUG Use!
     }
@@ -24,18 +26,18 @@ exports.Word = class {
     }
 }
 
-exports.Word_Class = class {
-    constructor()
+exports.Definition_Block = class {
+    constructor () 
     {
-        this.Word_Class='';
-        this.Grammatical_Category='';
+        this.Grammatical_Category = "";
         this.Inflected_Forms = [];
-        this.Definition = [];
+        //
+        this.Definitions = [];
     }
 }
 
 exports.Definition = class {
-    constructor () 
+    constructor()
     {
         this.Context     = "";
         this.Definitions = [];
@@ -43,11 +45,27 @@ exports.Definition = class {
     }
 }
 
-exports.Inflected_Form = class {
+/**
+ * Inflected forms are: Plurals, etc.
+ */
+exports.Inflected_Form = class 
+{
     constructor ()
     {
+        this.Grammatical_Category = '';
         this.Form = '';
         this.Pronunciation = '';
+    }
+}
+
+/**
+ * Synonyms for the word
+ */
+exports.Synonym = class {
+    constructor ()
+    {
+        this.Synonym   = "";
+        this.Relevance = 0;
     }
 }
 
@@ -59,10 +77,3 @@ exports.Etymology = class {
     }
 }
 
-exports.Synonyms = class {
-    constructor ()
-    {
-        this.BriefList = [];
-        this.Comprehensive = [];
-    }
-}

@@ -15,8 +15,9 @@ $log = console.log;
 //-Http Requests
 //let dictionaryURL = 'https://en.wiktionary.org/wiki/';
 let dictionaryURL = 'https://www.dictionary.com/browse/';
-//let wordURL       = 'lexicon';
-let wordURL       = 'edible';
+let thesaurus_URL = 'https://www.thesaurus.com/browse/';
+let wordURL       = 'lexicon';
+//let wordURL       = 'edible';
 //let wordURL         = 'wolf';
 //let wordURL         = 'regular';
 //let wordURL         = 'music';
@@ -27,36 +28,41 @@ let url = dictionaryURL + wordURL;
 var WORD = new WordClass.Word();
 WORD.Word = wordURL;
 
-
 //-StateMachine
 var STATE = new StateMachine.State_Machine();
 STATE.Set("SETUP");
-
 
 
 // ----- MAIN LOOP ----- //
 var mainLoop = setInterval( () =>
 {
 
-    if( STATE.Is("SETUP") )
+    if( STATE.Is("SETUP") ) //------------------->>>>>
     {
         STATE.Set("DICTIONARY");
     }
-    if( STATE.Is("DICTIONARY") )
+    if( STATE.Is("DICTIONARY") ) //-------------->>>>>
     {
-        STATE.Set("PROCESSING");
+        STATE.Process();
         //
         Scrape_Dictionary().then( (data) =>
         {
-            $log(`Dictionary output::${data}`);
+            $log(`--> Dictionary output::${data}`);
             STATE.Set("THESAURUS");
         });
     }
-    if( STATE.Is("THESAURUS") )
+    if( STATE.Is("THESAURUS") ) //--------------->>>>>
     {
+        STATE.Process();
+        //        
+        Scrape_Thesaurus().then( (data) => 
+        {
 
-        $log(`Starting Thesaurus scrape`);
-        clearInterval(mainLoop)
+            $log(`--> Scrape Thesaurus output::${data}`);
+            clearInterval(mainLoop)
+        })
+
+
     }
 
 
@@ -107,7 +113,62 @@ function Scrape_Dictionary() {
         });
 
     });
+}
 
+/**
+ * Scrape from Thesaurus.com
+ */
+function Scrape_Thesaurus() {
+    return new Promise((resolve, reject) => {
+
+        //-Set the URL
+        let Thesaurus_URL = thesaurus_URL + wordURL;
+
+        $log("____________________Scraping Thesaurus___________________");
+
+        axios.get(Thesaurus_URL).then((response) => {
+            //-DEBUG
+            $log(`Response::${response.status} | Response URL:: ${url}`);
+
+            //-Cheerio the data
+            const $ = cheerio.load(response.data);
+
+            let divSection;
+            // --- SECTIONS ---
+            // Synonym & Antonym class: .css-ajupon
+            $('div .css-ajupon').each((i, e) => {
+                let section = $(e).text();
+                $log(section);
+                // --- SYNONYMS ---
+                if (section.toLowerCase().startsWith('synonym')) {
+                    divSection = $(e).parent().html();
+                    LEX_Parse_Synonyms(divSection);
+                }
+                // --- ANTONYM ---
+                if (section.toLowerCase().startsWith('antonym')) {
+                    divSection = $(e).parent().html();
+                    LEX_Parse_Antonyms(divSection);
+                }
+                else
+                {
+                    $log("--->> No Antonyms found! <<<---");
+                }
+            });
+
+            // --- GET EXAMPLE WORD USAGES ---
+            let examples_section = $('.collapsible-content').html();
+            LEX_Parse_Examples(examples_section);
+
+
+            resolve("Thesaurus Scraped!");
+
+        }).catch( (error) =>
+        {
+
+
+
+        });
+    });
 }
 
 /**
@@ -136,17 +197,18 @@ function LEX_Parse_Definitions (_definitions)
             
             let defintion = cheerio.load( $(e).html() );
 
-            let wordClass = defintion('.luna-pos').text()
-            $log(`->Word Class::${wordClass}` );
-
             //*NOTE: Dictionary.com has another definition's section (The British section),
             // which doesn't use the .luna-pos tag.
             //-So add a condition: if the .luna-pos tag can't be found, skip this section!
-            let wordClassFound = (wordClass.trim()=='') ? false : true;
+            let _wordClass = defintion('.luna-pos').text();
+            let wordClassFound = (_wordClass.trim()=='') ? false : true;
             $log(`!!Word Class found::${wordClassFound}`);
-            //wordClassFound=true;
+            //wordClassFound=true; //<--testing
         if( wordClassFound==true )
         {
+            // Definition collection's word class/gramatical category
+            let definition_wordClass = defintion('.luna-pos').text().replace(',', '');
+            $log(`->Word Class::${definition_wordClass}` );
 
             let grammatical_category = defintion('.luna-grammatical-category').text();
             $log(`->Grammatical Category::${grammatical_category}` );
@@ -171,16 +233,20 @@ function LEX_Parse_Definitions (_definitions)
             INFLECTED_FORMS = [];
             for(let i=0; i<inflected_forms.length; i++)
             {
+                // CREATE INFLECTED FORM //////////////////////
                 let IF = new WordClass.Inflected_Form();
+                IF.Grammatical_Category = grammatical_category;
                 IF.Form = inflected_forms[i];
-                if( inflected_pron[i] != undefined ) IF.Pronunciation = inflected_pron[i];
+                if( inflected_pron[i] != undefined ) 
+                    IF.Pronunciation = inflected_pron[i];
+                //-Push
                 INFLECTED_FORMS.push( IF );
             }
 
-            WORD_CLASS = new WordClass.Word_Class();
-            WORD_CLASS.Word_Class = wordClass;
-            WORD_CLASS.Grammatical_Category = grammatical_category;
-            WORD_CLASS.Inflected_Forms = INFLECTED_FORMS;
+            // SAVE NEW DEFINITION BLOCK /////////////////////////
+            DEF_BLOCK = new WordClass.Definition_Block();
+            DEF_BLOCK.Grammatical_Category = definition_wordClass;
+            DEF_BLOCK.Inflected_Forms = INFLECTED_FORMS;
             
             
             //-Iterate through 'div' elements with a 'value' attribute
@@ -189,6 +255,7 @@ function LEX_Parse_Definitions (_definitions)
                 let defNo = $(e).attr('value');
                 if( defNo != undefined )
                 {
+                    // NEW DEFINITION //////////////////////////
                     let DEFINITION = new WordClass.Definition();
                     let contextualFound  = false;
                     let definition  = $(e).text();
@@ -196,7 +263,6 @@ function LEX_Parse_Definitions (_definitions)
 
                     //-Cheerio the definition to search for elements
                     let def = cheerio.load( $(e).html() );
-                    
                     
                     //-Contextual definitions-----------------------------||
                     let contextual_Definition = def('.luna-label').html(); //$log(`Context::${contextual_Definition}`)
@@ -255,23 +321,23 @@ function LEX_Parse_Definitions (_definitions)
                     //-Regular definition
                     $log(`>>Definition ${defNo}::${ definition }` );
 
-                    //+++Assign to Global Object
+                    // +Assign to Global Object ////////////////////////////////////////
                     DEFINITION.Context = contextual_Definition;
                     DEFINITION.Definitions = DEFINITION.Definitions.concat( definition );
                     DEFINITION.Examples = DEFINITION.Examples.concat( example );
 
-
-                    WORD_CLASS.Definition.push( DEFINITION );
+                    // Push this definition to the block ////
+                    DEF_BLOCK.Definitions.push( DEFINITION );
                 }
             });
 
             // DEBUG
             $log(`\nSection Index::${i}`);
 
-            //+++Add Definition to global WORD obj.
-            WORD.Definitions.push( WORD_CLASS );
+            // +Add Definition to global WORD obj. //
+            WORD.Definition_Blocks.push( DEF_BLOCK );
 
-            console.table( WORD.Definitions )
+            console.table( WORD.Definition_Blocks )
         }
 
     }//|END - Check if we've found a 'word-class' e.g. noun!
@@ -297,108 +363,111 @@ function LEX_Parse_Pronunciation (_pronunciation)
 }
 
 
-function LEX_Parse_WordOrigin (_origin)
+/**
+ * THESAURUS.COM PARSING METHODS
+ */
+
+/**
+ * Pull example sentances/usages of the word in question.
+ * @param {Object} _exampleSection HTML Object containing examples
+ */
+function LEX_Parse_Examples( _exampleSection )
 {
-    _origin = _origin.split(';');
-    let period = _origin[0];
-    let origin = _origin[1].trim();
+    //-Cheerio the html parameter
+    let $ = cheerio.load( _exampleSection );
+    $log('___EXAMPLES HTML___');
 
-        //DEBUG
-        $log(` > Origin - Period::${period}`);
-        $log(` > Origin - Origin::${origin}`);
-
-    //-Set WORD Object
-    WORD.Etymology = new WordClass.Etymology();
-    WORD.Etymology.Origin_Period = period;
-    WORD.Etymology.Origin = origin;
-
+    $('p').each( (i,e) =>
+    {
+        let example = $(e).text();
+        $log(`Example::${example}`);
+    });
 }
 
 /**
- * 
- * @param {Object} _synonyms HTML Element containing synonyms
+ * Scrape antonyms from Thesaurus.com
+ * @param {Object} _sections HTML Object to be Cheerio'd
  */
-function LEX_Parse_Synonyms (_synonyms)
+function LEX_Parse_Antonyms( _sections )
 {
 
-    //-Prime Synonym array
-    let Synonyms = [];
+    //-Cheerio the html parameter
+    let $ = cheerio.load( _sections );
+    $log('___ANTONYMS HTML___');
 
+    //-Vars to capture the synonym's relevance to the word
+    let classAsDivision = '';
+    let relevance = 1;
 
-    //-Load via Cheerio
-    let $ = cheerio.load( _synonyms );
-    //-Break into its HTML 
-    let _synonyms_E = $( _synonyms ).html();
-    //-Iterate over each element
-    $( _synonyms_E ).each( (i, el) =>
+    //-Iterate over each list-item
+    $('li').each( (i, e) => 
     {
-        let text = '';
-        if( $(el).hasClass('luna-xref') ) { //<-- class identified as actually containing synonyms
-            text = $(el).text();
-            Synonyms.push( text.toString() );
-            //$log(`Synonym::${text}`);
+        let antonym = $(e).text().trim();
+
+        //-Get the antonym's class
+        let antonym_class = $(e).children().children().attr('class');
+        //Setup
+        if( classAsDivision=='' ) classAsDivision = antonym_class;
+        else
+        {
+            // Compare the classes on each word, and if they don't match, this indicates
+            // the antonym's relevance has moved another increment away.
+            if( antonym_class!=classAsDivision )
+            {
+                relevance++;
+                classAsDivision = antonym_class;
+            }
         }
+
+        $log(`Antonym::${antonym} - Relevance::${relevance}`);
+    });
+}
+
+/**
+ * Scrape synonyms from Thesaurus.com
+ * @param {Object} _sections HTML Object to be Cheerio'd
+ */
+function LEX_Parse_Synonyms( _sections )
+{
+    //-Cheerio the html parameter
+    let $ = cheerio.load( _sections );
+    $log('___SYNONYMS HTML___');
+
+    //-Vars to capture the synonym's relevance to the word
+    let classAsDivision = '';
+    let relevance = 1;
+
+    //-Iterate over each list-item
+    $('li').each( (i, e) => 
+    {
+        let synonym = $(e).text().trim();
+
+        //-Get the synonym's class
+        let synonym_class = $(e).children().children().attr('class');
+        //Setup
+        if( classAsDivision=='' ) classAsDivision = synonym_class;
+        else
+        {
+            // Compare the classes on each word, and if they don't match, this indicates
+            // the synonym's relevance has moved another increment away.
+            if( synonym_class!=classAsDivision )
+            {
+                relevance++;
+                classAsDivision = synonym_class;
+            }
+        }
+
+        // ADD TO GLOBAL WORD OBJ ////////
+        SYNONYM = new WordClass.Synonym();
+        SYNONYM.Synonym   = synonym;
+        SYNONYM.Relevance = relevance;
+        //
+        WORD.Synonyms.push( SYNONYM );
+
+        $log(`Synonym::${synonym} - Relevance::${relevance}`);
     });
 
-    //-Set WORD Object
-    WORD.Synonyms = new WordClass.Synonyms();
-    WORD.Synonyms.BriefList = Synonyms.concat( WORD.Synonyms.BriefList );
-
-    // DEBUG
-    $log(`Synonyms [Brief List]::${WORD.Synonyms.BriefList}`);
 }
-
-
-function LEX_Parse_OtherWordsFrom (_otherWords)
-{
-
-    let Related_Forms = [];
-
-        //-Load via Cheerio
-        let $ = cheerio.load( _otherWords );
-        //-Break into its HTML 
-        let _otherWords_E = $( _otherWords ).html();
-        //-Iterate over each element
-        $( _otherWords_E ).each( (i, el) =>
-        {
-            let _subElements = $(el).html();
-            $( _subElements ).each( (i, subE) => 
-            {
-                let text = ''
-                if( $(subE).hasClass('luna-runon') ) {
-                    text = $(subE).text().replace(/·/g, '');
-                    Related_Forms.push( text );
-                    //$log(`Related F::${text}`);
-                }
-            });
-
-        });
-
-
-}
-
-
-
-// Read_Words().then( () => 
-// {
-//     $log("Finished reading...");
-// });
-
-// function Read_Words ()
-// {
-//     return new Promise( (resolve, reject) =>
-//     {
-//         let dir = "./LeDictionary/";
-//         let file= "words_alpha.txt";
-//         //
-//         let wordList = FS.readFileSync(dir+file);
-//         $log(wordList.toString())
-//         //$log(wordList[10])
-
-//         resolve();
-//         return;
-//     });
-// }
 
 
 

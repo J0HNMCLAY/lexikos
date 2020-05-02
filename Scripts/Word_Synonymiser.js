@@ -82,7 +82,10 @@ function LEX_Parse_Examples( _exampleSection )
     });
 }
 
-
+/**
+ * Scrape antonyms from Thesaurus.com
+ * @param {Object} _sections HTML Object to be Cheerio'd
+ */
 function LEX_Parse_Antonyms( _sections )
 {
 

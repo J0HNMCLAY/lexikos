@@ -6,6 +6,8 @@ exports.State_Machine = class
     {
         this.State = '';
         this.Loop  = 0;
+        //
+        this.Debug = false;
     }
     Is = (_state) => 
     { 
@@ -14,6 +16,9 @@ exports.State_Machine = class
     Set = (_state) => 
     { 
         this.State = _state; 
+        // DEBUG
+        console.log(`State-Machine. State updated to::${this.State}`);
     }
-    
+    Process = () => { this.State="PROCESSING"; }
+
 }

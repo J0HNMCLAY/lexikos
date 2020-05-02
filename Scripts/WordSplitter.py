@@ -35,6 +35,15 @@ def load_words():
 
     return valid_words
 
+def load_original_word_length ():
+    '''Initial function run to load the original collection of words'''
+    words = 0
+    with open(WORDS_DIR+WFILE) as word_file:
+        valid_words = set(word_file.read().split())
+        words += words
+
+    print('Total Word count::{w}'.format(w=len(valid_words)));
+
 def Write_ByInitial(_initial, _wordArray):
     initialUpper = UC[ LC.index(_initial) ]
     fileName = initialUpper + '.json';
@@ -46,16 +55,21 @@ def Write_ByInitial(_initial, _wordArray):
 
 def Get_Letter_Stats():
     '''Prints select stats from each letter to the console'''
+    words    = 0
     wordList = []
+
     for index, item in enumerate(UC):
         fileName = '{letter}.json'.format(letter=item)
         with open(WORDS_WIP_DIR+fileName, 'r') as wList:
             wordList = json.load(wList)
+            words += len(wordList)
 
         #-Stats
         fileSize = os.path.getsize(WORDS_WIP_DIR+fileName)
         output = 'Letter::{letter} - {entries} entries | Size::{size:.2f} KB'.format(letter=item, entries=len(wordList), size=(fileSize/1024) )
         print( output )
+
+    print( 'Total Word Count::{w}'.format(w=words))
 
 def Find_Word(_word):
     '''Check if a word exists in the .json dictionary'''
@@ -79,7 +93,8 @@ def Find_Word(_word):
 def Main():
     pass
     #Get_Letter_Stats()
-    Find_Word('japzzz')
+    #Find_Word('japzzz')
+    load_original_word_length();
 
 
 
@@ -93,6 +108,7 @@ def Main():
 WORDS_WIP_DIR = './Words_WIP/'
 WORDS_DIR = './Words/'
 OFILE     = 'words_alpha.txt'
+WFILE     = 'words.txt'
 UC = list( string.ascii_uppercase )
 LC = list( string.ascii_lowercase )
 WORD_LIST = [['' for i in range(1)] for j in range(27)]
