@@ -8,10 +8,13 @@ exports.Word = class {
     {
         this.Word='';
         this.Pronunciation='';
+        this.Forms = [];
         this.Definition_Blocks = [];
         //
         this.Synonyms  = [];
         this.Antonyms  = [];
+        //
+        this.Examples  = [];
         this.Etymology = '';
         //
         this.Off=false; //<-- DEBUG Use!
@@ -26,6 +29,9 @@ exports.Word = class {
     }
 }
 
+/**
+ * Defintion block - e.g. as definied by it's grammatical category!
+ */
 exports.Definition_Block = class {
     constructor () 
     {
@@ -36,6 +42,9 @@ exports.Definition_Block = class {
     }
 }
 
+/**
+ * Individual defintiion object
+ */
 exports.Definition = class {
     constructor()
     {
@@ -59,6 +68,18 @@ exports.Inflected_Form = class
 }
 
 /**
+ * Derived forms of the base word
+ */
+exports.Derived_Word_Forms = class {
+    constructor () {
+        this.Form = '';
+        this.Word_Class = '';
+        this.Pronunciation = '';
+        this.Inflection_Type = '';
+    }
+}
+
+/**
  * Synonyms for the word
  */
 exports.Synonym = class {
@@ -66,6 +87,26 @@ exports.Synonym = class {
     {
         this.Synonym   = "";
         this.Relevance = 0;
+    }
+}
+/**
+ * Antonyms for the word
+ */
+exports.Antonym = class {
+    constructor ()
+    {
+        this.Antonym   = "";
+        this.Relevance = 0;
+    }
+}
+/**
+ * Examples of the word
+ */
+exports.Example = class {
+    constructor ()
+    {
+        this.Example     = "";
+        this.Attribution = "";
     }
 }
 
@@ -76,4 +117,18 @@ exports.Etymology = class {
         this.Origin_Period = '';
     }
 }
+
+/*
+Word Forms::
+-->Forms::rushingly
+-->Forms::unrushed
+-->Forms::rushlike
+-->Forms::rusher
+-->Forms::rushlike
+-->Forms::rush
+-->Forms::rushes
+-->Forms::rushing
+-->Forms::rushed
+-->Forms::rushed
+*/
 
