@@ -8,6 +8,7 @@ exports.Word = class {
     {
         this.Word='';
         this.Pronunciation='';
+        this.Phonetic_Form='';
         this.Forms = [];
         this.Definition_Blocks = [];
         //
@@ -73,6 +74,7 @@ exports.Inflected_Form = class
 exports.Derived_Word_Forms = class {
     constructor () {
         this.Form = '';
+        this.Phonetic_Form='';
         this.Word_Class = '';
         this.Pronunciation = '';
         this.Inflection_Type = '';

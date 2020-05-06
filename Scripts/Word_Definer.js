@@ -17,13 +17,13 @@ let dictionaryURL = 'https://www.dictionary.com/browse/';
 let thesaurus_URL = 'https://www.thesaurus.com/browse/';
 let macmillian_URL= 'https://www.macmillandictionary.com/dictionary/british/';
 let pronunce_URL  = 'https://www.definitions.net/definition/';
-let syllables_URL = 'https://www.hyphenation24.com/word/';
-//let wordURL       = 'lexicon';
+let syllables_URL = 'https://www.howmanysyllables.com/words/';
+let wordURL       = 'lexicon';
 //let wordURL       = 'edible';
 //let wordURL         = 'wolf';
 //let wordURL         = 'regular';
 //let wordURL         = 'music';
-let wordURL       = 'rush';
+//let wordURL       = 'rush';
 let url = dictionaryURL + wordURL;
 
 
@@ -48,8 +48,10 @@ var mainLoop = setInterval( () =>
 
     if( STATE.Is("SETUP") ) //------------------->>>>>
     {
+        ADL_Get_Syllables(wordURL);
+        clearInterval(mainLoop)
         //STATE.Set("DICTIONARY");
-        STATE.Set("ADDITIONAL_INFO");
+        //STATE.Set("ADDITIONAL_INFO");
     }
     if( STATE.Is("DICTIONARY") ) //-------------->>>>>
     {
@@ -104,26 +106,26 @@ async function Scrape_Additional_Info ()
     await MMD_Parse_Word_Forms();
 
 
-    // ---PRONUNCIATION--- \\
-    await GGL_Get_Pronunciation().then( (_pronunciation) =>
+    // ---PHONETIC FORM--- \\
+    await ADL_Get_Phoenetics().then( (_phoneticForm) =>
     {
-        WORD.Pronunciation = _pronunciation;
-        $log(`->>Pronunciation::${ WORD.Pronunciation }`);
+        WORD.Phonetic_Form = _phoneticForm;
+        $log(`->>Phonetic Form::${ WORD.Phonetic_Form }`);
     });
 
-    // ---WORD-FORM PRONUNCIATION--- \\
-    for(let i=0; i<WORD.Forms; i++) 
+    // ---ADDITIONAL FORMS PHONETIC-FORM--- \\
+    for(let i=0; i<WORD.Forms.length; i++) 
     {
         let _word = WORD.Forms[i].Form;
-        await GGL_Get_Pronunciation(_word).then( (_pron) => {
-            WORD.Forms[i].Pronunciation = _pron;
+        await ADL_Get_Phoenetics(_word).then( (_pron) => {
+            WORD.Forms[i].Phonetic_Form = _pron;
         });
         $log('WORD FORMS::');
         console.table(WORD.Forms)
     }
 
     // for(var w in words) {
-    //     await GGL_Get_Pronunciation( words[w] );
+    //     await ADL_Get_Phoenetics( words[w] );
     //     //
     //     $log(`Pronunciation step::${words[w]}`)
     // }
@@ -294,20 +296,10 @@ async function MMD_Parse_Word_Forms(_wordForms) {
 }
 
 /**
- * 
- * @param {string} _word Optional - provide the word to Break into syllables
- */
-async function HPY_Get_Syllables (_word='') {
-
-
-
-}
-
-/**
  * Scrape pronunciation from Google
  * @param {string} _word The word that needs pronunciation information
  */
-async function GGL_Get_Pronunciation (_word='') {
+async function ADL_Get_Phoenetics (_word='') {
     return new Promise((resolve, reject) => {
 
         //-Get active word
@@ -341,6 +333,73 @@ async function GGL_Get_Pronunciation (_word='') {
         });//|AXIOS END
     });
 }
+
+/**
+ * Break a word into its syllabals!
+ * @param {string} _word The Word to Syllabify
+ */
+async function ADL_Get_Syllables (_word='') {
+    return new Promise((resolve, reject) => {
+
+        _word = 'Ham Fisted';
+
+        // DEBUG
+        $log(`Get syllables for::${_word}`);
+
+        //-Get active word
+        let word = _word.toLowerCase() || wordURL.toLowerCase;
+
+        //***Format word (incase it's a phrase) */
+        let words = [ word ];
+        if( word.includes(' ') ) words = word.split(' ');
+        if( word.includes('-') ) words = word.split('-');
+
+        let loops = words.length;
+
+        for(let i=0; i < loops; i++)
+        {
+            // DEBUG
+            $log(`Syllabalising this word part::${words[i]}`);
+
+            //-Set the URL
+            let Syllables_URL = (syllables_URL + words[i]);
+
+            //-Make the request...
+            axios.get( Syllables_URL ).then( (response) => 
+            {
+                // DEBUG
+                $log(`Response::${response.status} | Response URL:: ${Syllables_URL}`);
+
+                //-Cheerio the data
+                const $ = cheerio.load(response.data);
+
+                //-Pull pronunciation/hyphenation
+                let syllable = $('#SyllableContentContainer').text();
+                $log(`Syllable :: ${syllable}`)
+                //let _pronunciation = $('.hyphenator').text();
+                //resolve(_pronunciation);
+
+
+            });//|AXIOS END
+
+            resolve('Cracked all syllabals')
+
+        }
+
+
+
+        //#region Syllable algo...
+        // // Regex
+        // const syllableRegex = /[^aeiouy]*[aeiouy]+(?:[^aeiouy]*$|[^aeiouy](?=[^aeiouy]))?/gi;
+        // //-Format the word in question
+        // let word = _word.toLowerCase();
+        // let syllabified = word.match(syllableRegex);
+        // $log(`Syllabified word::${syllabified}`);
+        //#endregion
+
+    });
+}
+
 
 /**
  * DICTIONARY.COM PARSING METHODS --------------------------------------------->>>>>>>>>>
