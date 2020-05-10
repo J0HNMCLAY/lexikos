@@ -8,12 +8,14 @@ exports.Word = class {
     {
         this.Word='';
         this.Pronunciation='';
-        this.Phonetic_Form='';
+        this.Syllabic_Form='';
+        this.Syllables = [];
         this.Forms = [];
         this.Definition_Blocks = [];
         //
         this.Synonyms  = [];
         this.Antonyms  = [];
+        this.RelatedWord_Synonyms = [];
         //
         this.Examples  = [];
         this.Etymology = '';
@@ -72,9 +74,10 @@ exports.Inflected_Form = class
  * Derived forms of the base word
  */
 exports.Derived_Word_Forms = class {
-    constructor () {
+    constructor () 
+    {
         this.Form = '';
-        this.Phonetic_Form='';
+        this.Syllabic_Form='';
         this.Word_Class = '';
         this.Pronunciation = '';
         this.Inflection_Type = '';
@@ -89,6 +92,17 @@ exports.Synonym = class {
     {
         this.Synonym   = "";
         this.Relevance = 0;
+    }
+}
+
+/**
+ * Related Words with Synonyms
+ */
+exports.Related_Word_Synonyms = class {
+    constructor()
+    {
+        this.Related_Word = '';
+        this.Syonyms = [];
     }
 }
 /**

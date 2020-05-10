@@ -20,6 +20,7 @@ exports.State_Machine = class
         // DEBUG
         console.log(`State-Machine. State updated to::${this.State}`);
     }
+    Setup = () => { this.State = "SETUP"; }
     /**Convenience method */
     Process = () => { this.State="PROCESSING"; }
     /**Convenience method to finish */
@@ -36,11 +37,15 @@ exports.DebugController = class {
     {
         this.Definitions = false;
         this.Word_Forms  = false;
+        this.Pronunation = false;
+        this.Word_Class  = false;
         this.Def_Table   = false;
         this.Def_Examples= false;
         this.Synonyms    = false;
         this.Antonyms    = false;
         this.Syn_Examples= false;
+        this.Syllables   = false;
+        this.Pronunation = false;
     }
     Turn_All_On = (_OBJ) => 
     {

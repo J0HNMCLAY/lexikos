@@ -15,9 +15,12 @@ $log = console.log;
 //let dictionaryURL = 'https://en.wiktionary.org/wiki/';
 let dictionaryURL = 'https://www.dictionary.com/browse/';
 let thesaurus_URL = 'https://www.thesaurus.com/browse/';
+/**Macmilliandictonary.com */
 let macmillian_URL= 'https://www.macmillandictionary.com/dictionary/british/';
+/**Definitons.net */
 let pronunce_URL  = 'https://www.definitions.net/definition/';
-let syllables_URL = 'https://www.howmanysyllables.com/words/';
+/**Definitons.net */
+let syllables_URL = 'https://www.definitions.net/definition/';
 let wordURL       = 'lexicon';
 //let wordURL       = 'edible';
 //let wordURL         = 'wolf';
@@ -26,6 +29,9 @@ let wordURL       = 'lexicon';
 //let wordURL       = 'rush';
 let url = dictionaryURL + wordURL;
 
+//
+let Thesaurus_PAGES = 1;
+
 
 //-Instantiate a new Word class & assign the current word
 var WORD = new WordClass.Word();
@@ -33,12 +39,10 @@ WORD.Word = wordURL;
 
 //-StateMachine
 var STATE = new StateMachine.State_Machine();
-STATE.Set("SETUP");
+STATE.Setup();
 
 //-Debug Controller
 var DEBUG = new StateMachine.DebugController();
-//DEBUG.Turn_All_On(DEBUG)
-//return;
 
 
 // ----- MAIN LOOP ----- ///////////////////////////////////////////////////////////////
@@ -48,10 +52,8 @@ var mainLoop = setInterval( () =>
 
     if( STATE.Is("SETUP") ) //------------------->>>>>
     {
-        ADL_Get_Syllables(wordURL);
-        clearInterval(mainLoop)
         //STATE.Set("DICTIONARY");
-        //STATE.Set("ADDITIONAL_INFO");
+        STATE.Set("ADDITIONAL_INFO");
     }
     if( STATE.Is("DICTIONARY") ) //-------------->>>>>
     {
@@ -72,6 +74,7 @@ var mainLoop = setInterval( () =>
         {
             $log(`--> Scrape Thesaurus output::${data}`);
             STATE.Set("ADDITIONAL_INFO");
+            STATE.Finish();
         })
     }
     if( STATE.Is("ADDITIONAL_INFO") )
@@ -80,8 +83,8 @@ var mainLoop = setInterval( () =>
         //
         Scrape_Additional_Info().then( (data) =>
         {
-
             $log('----------- Additional Info. Scraped --------------')
+            clearInterval(mainLoop)
         });
     }
     if( STATE.IS_FINISHED() ) //------------------>>>>>
@@ -99,39 +102,59 @@ var mainLoop = setInterval( () =>
 async function Scrape_Additional_Info () 
 {
 
-    let words = WORD.Forms;
-    console.table( words )
-
     // ---GET ADDITIONAL WORD FORMS--- \\
     await MMD_Parse_Word_Forms();
 
-
-    // ---PHONETIC FORM--- \\
-    await ADL_Get_Phoenetics().then( (_phoneticForm) =>
+    // ---SYLLABIC FORM--- \\
+    await ADL_Get_SyllabicForm().then( (_syllabicForm) =>
     {
-        WORD.Phonetic_Form = _phoneticForm;
-        $log(`->>Phonetic Form::${ WORD.Phonetic_Form }`);
+        WORD.Syllabic_Form = _syllabicForm;
+        // create syllables
+        if( WORD.Syllabic_Form.includes('·') )
+            WORD.Syllables = WORD.Syllabic_Form.split('·');
+
+        // DEBUG
+        if (DEBUG.Syllables) {
+            $log(`->>Syllabic Form MAIN::${WORD.Syllabic_Form}`);
+            $log(`->>Syllables::${WORD.Syllables}`);
+        }
     });
 
-    // ---ADDITIONAL FORMS PHONETIC-FORM--- \\
+    // ---GET WORD PRONUNCIATION--- \\
+    await ADL_Get_Pronunciation().then( (pronunciation) =>
+    {
+        WORD.Pronunciation = pronunciation;
+        if( DEBUG.Pronunation ) $log(`>>Pronuniation::${WORD.Pronunciation}`);
+    })
+
+    // ---ADDITIONAL FORMS SYLLABIC-FORM--- \\
     for(let i=0; i<WORD.Forms.length; i++) 
     {
+        $log(`Loop::${i} | Form::${WORD.Forms[i].Form}`)
+        //
         let _word = WORD.Forms[i].Form;
-        await ADL_Get_Phoenetics(_word).then( (_pron) => {
-            WORD.Forms[i].Phonetic_Form = _pron;
+        await ADL_Get_SyllabicForm(_word).then( (_syllForm) => 
+        {
+            WORD.Forms[i].Syllabic_Form = _syllForm;
         });
-        $log('WORD FORMS::');
-        console.table(WORD.Forms)
     }
 
+    // ---GET RELATED WORDS & THEIR SYNONYMS--- \\
+    await ADL_GetRelatedWords_Synonyms().then( (data) =>
+    {
+        $log('>> FINISHED Related Words & Synonyms!')
+    });
+
+    $log('-->> LAST Part of Additional Info <<--');
+
+
     // for(var w in words) {
-    //     await ADL_Get_Phoenetics( words[w] );
+    //     await ADL_Get_SyllabicForm( words[w] );
     //     //
     //     $log(`Pronunciation step::${words[w]}`)
     // }
 
 }
-
 
 /**
  * Scrape from Dictionary.com
@@ -146,7 +169,7 @@ function Scrape_Dictionary() {
         axios.get(Dictionary_URL).then((response) => {
 
             //-DEBUG
-            $log(`Response::${response.status} | Response URL:: ${url}`);
+            $log(`Response::${response.status} | Response URL:: ${Dictionary_URL}`);
 
             //-Cheerio the data
             const $ = cheerio.load(response.data);
@@ -194,11 +217,19 @@ function Scrape_Thesaurus() {
         $log("____________________Scraping Thesaurus___________________");
 
         axios.get(Thesaurus_URL).then((response) => {
-            //-DEBUG
-            $log(`Response::${response.status} | Response URL:: ${url}`);
+            // DEBUG
+            $log(`Response::${response.status} | Response URL:: ${Thesaurus_URL}`);
 
             //-Cheerio the data
             const $ = cheerio.load(response.data);
+
+            // Get Pages...
+            $('.rc-pagination').children().each( (i,e) =>
+            {
+                page = parseInt( $(e).text() );
+                if( !isNaN(page) ) Thesaurus_PAGES = page;
+                //$log(`Pagination TExt::${PAGES}`);
+            });
 
             let divSection;
             // --- SECTIONS ---
@@ -227,15 +258,13 @@ function Scrape_Thesaurus() {
             let examples_section = $('.collapsible-content').html();
             LEX_Parse_Examples(examples_section);
 
-
-            resolve("Thesaurus Scraped!");
+            resolve('Thesaurus scraped!');
 
         }).catch( (error) =>
         {
 
-
-
         });
+
     });
 }
 
@@ -245,12 +274,14 @@ function Scrape_Thesaurus() {
 async function MMD_Parse_Word_Forms(_wordForms) {
     return new Promise((resolve, reject) => {
 
+        $log(`Running function::MMD_Parse_Word_Forms >>>>>`);
+
         //-Build URL
         let MacMillan_URL = macmillian_URL + wordURL;
 
         //-Make the request...
-        axios.get(MacMillan_URL).then((response) => {
-
+        axios.get( MacMillan_URL ).then((response) => 
+        {
             //-Load via Cheerio
             let $ = cheerio.load(response.data);
 
@@ -260,82 +291,179 @@ async function MMD_Parse_Word_Forms(_wordForms) {
             let _WordForms = [];
 
             //-Iterate through the table 
-            $('tr').each((i, e) => {
+            $('tr').each((i, e) => 
+            {
                 let row_HTML = $(e).html()
                 let $$ = cheerio.load(row_HTML);
                 //
                 let inflectionType = $$('.INFLECTION-TYPE').text();
                 if (DEBUG.Word_Forms) $log(`Inflection Type ${i}::${inflectionType}`);
+
                 let form = $$('.INFLECTION-CONTENT').text();
                 if (DEBUG.Word_Forms) $log(`Inflection Form ${i}::${form}`);
 
+                let pronunciation = $('.PRON').text();
+                if( DEBUG.Pronunation ) $log(`Pronunciation ${i}::${pronunciation}`);
+
+                let wordClass = $('.PART-OF-SPEECH').text().split(' ')[0];
+                if( DEBUG.Word_Class )$log(`Word Class ${i}::${wordClass}`);
+
                 //+++Add word form to the WORD object
                 if (form != '') {
-                if (inflectionType != '' || form != '') {
-                        let WORD_FORM = new WordClass.Derived_Word_Forms();
-                        WORD_FORM.Form = form;
-                        WORD_FORM.Inflection_Type = inflectionType;
-                        //-Add to forms to temp-list
-                        _WordForms.push(WORD_FORM);
+                if (inflectionType != '' || form != '') 
+                {
+                    let _wordForm = new WordClass.Derived_Word_Forms();
+                    _wordForm.Form = form;
+                    _wordForm.Inflection_Type = inflectionType;
+                    _wordForm.Pronunciation   = pronunciation;
+                    _wordForm.Word_Class      = wordClass;
+                    //-Add to forms to temp-list
+                    _WordForms.push(_wordForm);
                 }}
-
             });
 
             //-Add the new/basic forms to the 'fore of the Forms array
-            WORD.Forms = _WordForms.concat(WORD.Forms);
-            // DEBUG
-            // for( var f in WORD.Forms){
-            //     $log(`-> Word Forms::${WORD.Forms[f].Form}`)
-            // }
+
+            //$log("Word Forms-->")
+            //console.table( WORD_FORMS );
+
+            //++Add to the Global Word object
+            for(let i=0; i<_WordForms.length; i++)
+            {
+                WORD.Forms.push( _WordForms[i] );
+            }
 
             resolve();
-
+            
         });
 
     });
 }
 
 /**
- * Scrape pronunciation from Google
- * @param {string} _word The word that needs pronunciation information
+ * Get the pronunciation of the current KeyWord from the McMillan dictionary
+ * @param {string} _word The word we're working with
  */
-async function ADL_Get_Phoenetics (_word='') {
+async function ADL_Get_Pronunciation(_word) {
     return new Promise((resolve, reject) => {
+
+        $log(`Running function::ADL_Get_Pronunciation >>>>>`);
+
+        //-Parse word
+        let word = _word || wordURL;
+
+        //-Build URL
+        let MacMillan_URL = macmillian_URL + word;
+
+        //-Make the request...
+        axios.get( MacMillan_URL ).then((response) => 
+        {
+            const $ = cheerio.load(response.data);
+
+            let pronunciation = $('.PRON').text();
+            if( DEBUG.Pronunation ) $log(`Pronunciaton::${pronunciation}`);
+
+            resolve(pronunciation);
+        });
+    });
+}
+
+/**
+ * Scrape pronunciation from Google
+ * @param {string} _word The word we're using
+ */
+async function ADL_Get_SyllabicForm (_word='') {
+    return new Promise((resolve, reject) => {
+
+        $log(`Running function::ADL_Get_SyllabicForm >>>>>`);
 
         //-Get active word
         if( _word=='' ) _word = wordURL;
 
         //-Set the URL
-        let DefinitionsNET_URL = pronunce_URL + _word;
+        let Syllables_URL = syllables_URL + _word; // definitions.net
 
         //-Make the request...
-        axios.get( DefinitionsNET_URL ).then( (response) => 
+        axios.get( Syllables_URL ).then( (response) => 
         {
             // DEBUG
-            $log(`Response::${response.status} | Response URL:: ${DefinitionsNET_URL}`);
+            $log(`Response::${response.status} | Response URL:: ${Syllables_URL}`);
 
             //-Cheerio the data
             const $ = cheerio.load(response.data);
 
-            //-Pull pronunciation/hyphenation
-            let _pronunciation = $('.hyphenator').text();
+            //-Pull syllabic form
+            let _syllabicForm = $('.hyphenator').text();
+            if( DEBUG.Syllables ) $log(`Syllabic Form:${_syllabicForm}`);
 
-            // Iterate through multiple ***so far, there has only ever been 1!
-            // $('.hyphenator').each( (i,e) =>
-            // {
-            //     _pronunciation = $(e).text();
-            //     $log(`->Pronunciation::${ _pronunciation }`)
-            // });
-
-
-            resolve(_pronunciation);
+            resolve( _syllabicForm );
             return;
         });//|AXIOS END
     });
 }
 
 /**
- * Break a word into its syllabals!
+ * Get related words, and the syononyms for each related word!
+ * @param {string} _word 
+ */
+async function ADL_GetRelatedWords_Synonyms (_word='') {
+    return new Promise((resolve, reject) => 
+    {
+        //-Set the URL
+        let Thesaurus_URL = thesaurus_URL + wordURL;
+
+        $log("____________________Scraping Thesaurus for Related Words/Synonyms___________________");
+
+        //-Loop through each page of related words + synonyms
+        for (let i = 1; i <= Thesaurus_PAGES; i++) 
+        {
+            //-Set the page URL
+            let Thesaurus_URL_page = Thesaurus_URL + '/' + i.toString();
+            //-Run the request
+            axios.get(Thesaurus_URL_page).then((response) => 
+            {
+                // DEBUG
+                $log(`Response::${response.status} | Response URL:: ${Thesaurus_URL}`);
+
+                //-Cheerio the data
+                const $ = cheerio.load(response.data);
+
+                $log(`Pagination Pages::${Thesaurus_PAGES}`);
+
+                //-Get Related-Word sections ...CSS class = .e1x7e0fw0
+                $('.e1x7e0fw0').each( (i,e) =>
+                {
+                    let $$ = cheerio.load(e);
+
+                    let _relatedWord_Synonyms = new WordClass.Related_Word_Synonyms();
+
+                    //-Get Related Word
+                    let _relatedWord = $$('h3').text();
+                    _relatedWord_Synonyms.Related_Word = _relatedWord;
+                    $log(`Related Word Section title::${_relatedWord}`);
+
+                    //-Get Synonyms
+                    $$('li').each((i,e) =>
+                    {
+                        let _synonym = $$(e).text();
+                        _relatedWord_Synonyms.push( _synonym );
+                        $log(`Synonym::${_synonym}`);
+                    });
+
+                    //+++Add to Global Object
+                    WORD.RelatedWord_Synonyms.push( _relatedWord_Synonyms );
+                });
+
+                //-Resolve scrape
+                if( i==PAGES ) resolve();
+            });
+        }
+
+    });
+}
+
+/**
+ * Break a word into its syllabals! - WORK IN PROGRESS - ADL_GET_Phonetics() does a better job!
  * @param {string} _word The Word to Syllabify
  */
 async function ADL_Get_Syllables (_word='') {
@@ -620,12 +748,12 @@ function LEX_Parse_Derivations ( _otherForms )
                     let word_form = _form.split(',');
 
                     //+++Create Word Form Object //////////////////////
-                    let WORD_FORM = new WordClass.Derived_Word_Forms();
-                    WORD_FORM.Form = word_form[0].replace(/·/g, '');
-                    WORD_FORM.Word_Class = word_form[1].trim();
-                    WORD_FORM.Pronunciation = word_form[0];
+                    let WORD_FORMS = new WordClass.Derived_Word_Forms();
+                    WORD_FORMS.Form = word_form[0].replace(/·/g, '');
+                    WORD_FORMS.Word_Class = word_form[1].trim();
+                    WORD_FORMS.Pronunciation = word_form[0];
                     //
-                    WORD.Forms.push( WORD_FORM );
+                    WORD.Forms.push( WORD_FORMS );
                     //
                     if( DEBUG.Word_Forms) $log( `Word Form ${x}::${word_form[x]}` );
                 }
@@ -676,23 +804,27 @@ function LEX_Parse_Dictionary_Examples( _exampleSection )
  * Pull example sentances/usages of the word in question.
  * @param {Object} _exampleSection HTML Object containing examples
  */
-function LEX_Parse_Examples( _exampleSection )
-{
-    //-Cheerio the html parameter
-    let $ = cheerio.load( _exampleSection );
-    $log('___EXAMPLES HTML___');
+function LEX_Parse_Examples(_exampleSection) {
+    //return new Promise((resolve, reject) => {
 
-    $('p').each( (i,e) =>
-    {
-        let example = $(e).text();
-        if( DEBUG.Syn_Examples ) $log(`Example::${example}`);
+        //-Cheerio the html parameter
+        let $ = cheerio.load(_exampleSection);
+        $log('___EXAMPLES HTML___');
 
-        //+ Add EXAMPLE //////////////////////
-        let EXAMPLE = new WordClass.Example();
-        EXAMPLE.Example = example;
-        //
-        WORD.Examples.push( EXAMPLE );
-    });
+        $('p').each((i, e) => {
+            let example = $(e).text();
+            if (DEBUG.Syn_Examples) $log(`Example::${example}`);
+
+            //+ Add EXAMPLE //////////////////////
+            let EXAMPLE = new WordClass.Example();
+            EXAMPLE.Example = example;
+            //
+            WORD.Examples.push(EXAMPLE);
+        });
+
+        $log("Examples pulled!");
+        //resolve();
+    //});
 }
 
 /**
@@ -775,7 +907,7 @@ function LEX_Parse_Synonyms( _sections )
             }
         }
 
-        // ADD TO GLOBAL WORD OBJ ////////
+        // ADD TO GLOBAL WORD OBJ ////////////
         let SYNONYM = new WordClass.Synonym();
         SYNONYM.Synonym   = synonym;
         SYNONYM.Relevance = relevance;
