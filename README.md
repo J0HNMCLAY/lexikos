@@ -1,4 +1,4 @@
-# _lexikos
+# _lexikos database!
 "Open source, organised dictionary of English words"
 
 **Backend functionality that creates the Lexikos database!**
