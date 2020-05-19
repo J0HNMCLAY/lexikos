@@ -106,38 +106,38 @@ async function Scrape_Additional_Info ()
     await MMD_Parse_Word_Forms();
 
     // ---SYLLABIC FORM--- \\
-    await ADL_Get_SyllabicForm().then( (_syllabicForm) =>
-    {
-        WORD.Syllabic_Form = _syllabicForm;
-        // create syllables
-        if( WORD.Syllabic_Form.includes('·') )
-            WORD.Syllables = WORD.Syllabic_Form.split('·');
+    // await ADL_Get_SyllabicForm().then( (_syllabicForm) =>
+    // {
+    //     WORD.Syllabic_Form = _syllabicForm;
+    //     // create syllables
+    //     if( WORD.Syllabic_Form.includes('·') )
+    //         WORD.Syllables = WORD.Syllabic_Form.split('·');
 
-        // DEBUG
-        if (DEBUG.Syllables) {
-            $log(`->>Syllabic Form MAIN::${WORD.Syllabic_Form}`);
-            $log(`->>Syllables::${WORD.Syllables}`);
-        }
-    });
+    //     // DEBUG
+    //     if (DEBUG.Syllables) {
+    //         $log(`->>Syllabic Form MAIN::${WORD.Syllabic_Form}`);
+    //         $log(`->>Syllables::${WORD.Syllables}`);
+    //     }
+    // });
 
-    // ---GET WORD PRONUNCIATION--- \\
-    await ADL_Get_Pronunciation().then( (pronunciation) =>
-    {
-        WORD.Pronunciation = pronunciation;
-        if( DEBUG.Pronunation ) $log(`>>Pronuniation::${WORD.Pronunciation}`);
-    })
+    // // ---GET WORD PRONUNCIATION--- \\
+    // await ADL_Get_Pronunciation().then( (pronunciation) =>
+    // {
+    //     WORD.Pronunciation = pronunciation;
+    //     if( DEBUG.Pronunation ) $log(`>>Pronuniation::${WORD.Pronunciation}`);
+    // })
 
-    // ---ADDITIONAL FORMS SYLLABIC-FORM--- \\
-    for(let i=0; i<WORD.Forms.length; i++) 
-    {
-        $log(`Loop::${i} | Form::${WORD.Forms[i].Form}`)
-        //
-        let _word = WORD.Forms[i].Form;
-        await ADL_Get_SyllabicForm(_word).then( (_syllForm) => 
-        {
-            WORD.Forms[i].Syllabic_Form = _syllForm;
-        });
-    }
+    // // ---ADDITIONAL FORMS SYLLABIC-FORM--- \\
+    // for(let i=0; i<WORD.Forms.length; i++) 
+    // {
+    //     $log(`Loop::${i} | Form::${WORD.Forms[i].Form}`)
+    //     //
+    //     let _word = WORD.Forms[i].Form;
+    //     await ADL_Get_SyllabicForm(_word).then( (_syllForm) => 
+    //     {
+    //         WORD.Forms[i].Syllabic_Form = _syllForm;
+    //     });
+    // }
 
     // ---GET RELATED WORDS & THEIR SYNONYMS--- \\
     await ADL_GetRelatedWords_Synonyms().then( (data) =>
@@ -223,13 +223,13 @@ function Scrape_Thesaurus() {
             //-Cheerio the data
             const $ = cheerio.load(response.data);
 
-            // Get Pages...
-            $('.rc-pagination').children().each( (i,e) =>
-            {
-                page = parseInt( $(e).text() );
-                if( !isNaN(page) ) Thesaurus_PAGES = page;
-                //$log(`Pagination TExt::${PAGES}`);
-            });
+            // // Get Pages...
+            // $('.rc-pagination').children().each( (i,e) =>
+            // {
+            //     page = parseInt( $(e).text() );
+            //     if( !isNaN(page) ) Thesaurus_PAGES = page;
+            //     //$log(`Pagination TExt::${PAGES}`);
+            // });
 
             let divSection;
             // --- SECTIONS ---
@@ -409,55 +409,120 @@ async function ADL_Get_SyllabicForm (_word='') {
 async function ADL_GetRelatedWords_Synonyms (_word='') {
     return new Promise((resolve, reject) => 
     {
-        //-Set the URL
-        let Thesaurus_URL = thesaurus_URL + wordURL;
 
-        $log("____________________Scraping Thesaurus for Related Words/Synonyms___________________");
+        $log('________________GET RELATED WORDS + SYNONYMS___________________');
 
-        //-Loop through each page of related words + synonyms
-        for (let i = 1; i <= Thesaurus_PAGES; i++) 
+        //-Parse word
+        let word = (_word=='') ? wordURL : _word;
+
+        // Scrape related words over numerous pages
+        let Current_PAGE    = 0;
+        let Thesaurus_PAGES = 1;
+        let iCounter = 0;
+
+        //-Set the page URL
+        let Thesaurus_URL = thesaurus_URL + word;
+
+        //-Run the request
+        axios.get(Thesaurus_URL).then((response) => 
         {
-            //-Set the page URL
-            let Thesaurus_URL_page = Thesaurus_URL + '/' + i.toString();
-            //-Run the request
-            axios.get(Thesaurus_URL_page).then((response) => 
+            // DEBUG
+            $log(`Response::${response.status} | Response URL:: ${Thesaurus_URL}`);
+
+            //-Cheerio the data
+            const $ = cheerio.load(response.data);
+
+            // Get Pages... ////////////////////////////////
+            $('.rc-pagination').children().each( (i,e) =>
             {
-                // DEBUG
-                $log(`Response::${response.status} | Response URL:: ${Thesaurus_URL}`);
-
-                //-Cheerio the data
-                const $ = cheerio.load(response.data);
-
-                $log(`Pagination Pages::${Thesaurus_PAGES}`);
-
-                //-Get Related-Word sections ...CSS class = .e1x7e0fw0
-                $('.e1x7e0fw0').each( (i,e) =>
-                {
-                    let $$ = cheerio.load(e);
-
-                    let _relatedWord_Synonyms = new WordClass.Related_Word_Synonyms();
-
-                    //-Get Related Word
-                    let _relatedWord = $$('h3').text();
-                    _relatedWord_Synonyms.Related_Word = _relatedWord;
-                    $log(`Related Word Section title::${_relatedWord}`);
-
-                    //-Get Synonyms
-                    $$('li').each((i,e) =>
-                    {
-                        let _synonym = $$(e).text();
-                        _relatedWord_Synonyms.push( _synonym );
-                        $log(`Synonym::${_synonym}`);
-                    });
-
-                    //+++Add to Global Object
-                    WORD.RelatedWord_Synonyms.push( _relatedWord_Synonyms );
-                });
-
-                //-Resolve scrape
-                if( i==PAGES ) resolve();
+                page = parseInt( $(e).text() );
+                if( !isNaN(page) ) Thesaurus_PAGES = page;
+                //$log(`Pagination TExt::${PAGES}`);
             });
-        }
+            $log(`Total Pages::${Thesaurus_PAGES}`);///
+
+            
+            //-Setup state-machine to handle each page iteration
+            let iState = new StateMachine.State_Machine();
+            iState.Setup();
+
+            //-Iterate through
+            let iStateInterval = setInterval( () => 
+            {
+                iCounter++;
+
+                if(iState.Is("SETUP")) //------------------------------------------>>>>>
+                {
+                    iState.Process();
+
+                    //-Update the page & check if we've coverered every page!
+                    Current_PAGE++;
+                    if( Current_PAGE > Thesaurus_PAGES ) iState.Finish();
+
+                    //-Set the page URL
+                    Thesaurus_URL = thesaurus_URL + word + '/' + Current_PAGE;
+
+                    //-Update to next state
+                    if(!iState.IS_FINISHED() ) iState.Set("REQUEST_PAGE");
+
+                }
+                if(iState.Is("REQUEST_PAGE")) //------------------------------------>>>>>
+                {
+                    iState.Process(`State to:request page | Thesaurus URL::${Thesaurus_URL}`);
+                    //$log(`Thesaurus URL::${Thesaurus_URL}`)
+                    //-Run the request
+                    axios.get(Thesaurus_URL).then((response) => 
+                    {
+                        // DEBUG
+                        $log(`Response::${response.status} | Response URL:: ${Thesaurus_URL}`);
+
+                        //-Cheerio the data
+                        const $ = cheerio.load(response.data);
+
+                        //-Get Related-Word sections ...CSS class = .e1x7e0fw0
+                        $('.e1x7e0fw0').each( (i,e) =>
+                        {
+                            let $$ = cheerio.load(e);
+
+                            let _relatedWord_Synonyms = new WordClass.Related_Word_Synonyms();
+
+                            //-Get Related Word
+                            let _relatedWord = $$('h3').text();
+                            _relatedWord_Synonyms.Related_Word = _relatedWord;
+                            $log(`Related Word Section title::${_relatedWord}`);
+
+                            //-Get Synonyms
+                            $$('li').each((i,e) =>
+                            {
+                                let _synonym = $$(e).text();
+                                _relatedWord_Synonyms.Synonyms.push( _synonym );
+                                //$log(`Synonym::${_synonym}`);
+                            });
+
+                            //+++Add to Global Object
+                            WORD.RelatedWord_Synonyms.push( _relatedWord_Synonyms );
+
+                        });
+
+                        //-Update State
+                        iState.Set("SETUP");
+                    });
+                }
+                if( iState.IS_FINISHED() ) //------------------------------------>>>>>
+                {
+                    // FINISH UP
+                    clearInterval(iStateInterval);
+                    resolve();
+                }
+                // DEBUG
+                //$log(`Loops::${iCounter}`);
+
+            }, 500);
+
+        }).catch( (error) => 
+        {
+            $log(`Axios [Get Related Words] failed with the error::${error}`);
+        })
 
     });
 }

@@ -22,7 +22,7 @@ exports.State_Machine = class
     }
     Setup = () => { this.State = "SETUP"; }
     /**Convenience method */
-    Process = () => { this.State="PROCESSING"; }
+    Process = (msg='') => { this.State="PROCESSING"; msg = msg + '\nState update to::PROCESSING'; if(msg!='') console.log(msg); }
     /**Convenience method to finish */
     Finish = () => { this.State=this.FinishState; }
     IS_FINISHED = () => { if(this.State==this.FinishState) return true; return false; }

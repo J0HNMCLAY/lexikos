@@ -102,7 +102,7 @@ exports.Related_Word_Synonyms = class {
     constructor()
     {
         this.Related_Word = '';
-        this.Syonyms = [];
+        this.Synonyms = [];
     }
 }
 /**
