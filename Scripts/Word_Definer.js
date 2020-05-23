@@ -105,7 +105,7 @@ async function Scrape_Additional_Info ()
     // ---GET ADDITIONAL WORD FORMS--- \\
     await MMD_Parse_Word_Forms();
 
-    // ---SYLLABIC FORM--- \\
+    // // ---SYLLABIC FORM--- \\
     // await ADL_Get_SyllabicForm().then( (_syllabicForm) =>
     // {
     //     WORD.Syllabic_Form = _syllabicForm;
@@ -139,13 +139,17 @@ async function Scrape_Additional_Info ()
     //     });
     // }
 
-    // ---GET RELATED WORDS & THEIR SYNONYMS--- \\
-    await ADL_GetRelatedWords_Synonyms().then( (data) =>
-    {
-        $log('>> FINISHED Related Words & Synonyms!')
-    });
+    // // ---GET RELATED WORDS & THEIR SYNONYMS--- \\
+    // await ADL_GetRelatedWords_Synonyms().then( (data) =>
+    // {
+    //     $log('>> FINISHED Related Words & Synonyms!')
+    // });
 
-    $log('-->> LAST Part of Additional Info <<--');
+    // ---GET RHYMES--- \\
+    await ADL_GetWordRhymes().then( (data) =>
+    {
+        $log('>> FINISHED acquiring word rhymes!')
+    });
 
 
     // for(var w in words) {
@@ -418,7 +422,6 @@ async function ADL_GetRelatedWords_Synonyms (_word='') {
         // Scrape related words over numerous pages
         let Current_PAGE    = 0;
         let Thesaurus_PAGES = 1;
-        let iCounter = 0;
 
         //-Set the page URL
         let Thesaurus_URL = thesaurus_URL + word;
@@ -432,14 +435,14 @@ async function ADL_GetRelatedWords_Synonyms (_word='') {
             //-Cheerio the data
             const $ = cheerio.load(response.data);
 
-            // Get Pages... ////////////////////////////////
+            // Get Pages... ////////////////////////////////////////////
             $('.rc-pagination').children().each( (i,e) =>
             {
                 page = parseInt( $(e).text() );
                 if( !isNaN(page) ) Thesaurus_PAGES = page;
                 //$log(`Pagination TExt::${PAGES}`);
             });
-            $log(`Total Pages::${Thesaurus_PAGES}`);///
+            $log(`Total Pages of Related Words::${Thesaurus_PAGES}`);///
 
             
             //-Setup state-machine to handle each page iteration
@@ -449,7 +452,6 @@ async function ADL_GetRelatedWords_Synonyms (_word='') {
             //-Iterate through
             let iStateInterval = setInterval( () => 
             {
-                iCounter++;
 
                 if(iState.Is("SETUP")) //------------------------------------------>>>>>
                 {
@@ -482,14 +484,14 @@ async function ADL_GetRelatedWords_Synonyms (_word='') {
                         //-Get Related-Word sections ...CSS class = .e1x7e0fw0
                         $('.e1x7e0fw0').each( (i,e) =>
                         {
-                            let $$ = cheerio.load(e);
+                            let $$ = cheerio.load(e); // load the element
 
                             let _relatedWord_Synonyms = new WordClass.Related_Word_Synonyms();
 
                             //-Get Related Word
                             let _relatedWord = $$('h3').text();
                             _relatedWord_Synonyms.Related_Word = _relatedWord;
-                            $log(`Related Word Section title::${_relatedWord}`);
+                           if( DEBUG.Related_Words ) $log(`Related Word Section title::${_relatedWord}`);
 
                             //-Get Synonyms
                             $$('li').each((i,e) =>
@@ -501,7 +503,6 @@ async function ADL_GetRelatedWords_Synonyms (_word='') {
 
                             //+++Add to Global Object
                             WORD.RelatedWord_Synonyms.push( _relatedWord_Synonyms );
-
                         });
 
                         //-Update State
@@ -514,6 +515,7 @@ async function ADL_GetRelatedWords_Synonyms (_word='') {
                     clearInterval(iStateInterval);
                     resolve();
                 }
+
                 // DEBUG
                 //$log(`Loops::${iCounter}`);
 
@@ -523,6 +525,66 @@ async function ADL_GetRelatedWords_Synonyms (_word='') {
         {
             $log(`Axios [Get Related Words] failed with the error::${error}`);
         })
+    });
+}
+
+/**
+ * 
+ */
+async function ADL_GetWordRhymes (_word='') {
+    return new Promise((resolve, reject) => {
+
+        //-Parse the current word!
+        let word = (_word=='') ? wordURL : _word;
+        //
+        let Rhyme_URL = `https://www.rhymezone.com/r/rhyme.cgi?Word=${word}&org1=syl&org2=l&org3=y&typeofrhyme=perfect`;
+
+        //-Make the request
+        axios.get(Rhyme_URL).then((response) => 
+        {
+            // DEBUG
+            $log(`Response::${response.status} | Response URL:: ${Rhyme_URL}`);
+
+            // Cheerio the data
+            let $  = cheerio.load(response.data);
+            let $$ = cheerio.load( $('td[align="left"]').html() ); //<-- HTML with syllable based rhymes
+
+            $log('RHYME HTML::');
+
+            //Syllable vars
+            let syllable_no = 0;
+            let syllable_header = '';
+
+            $$('b').each( (i,e) =>
+            {
+                // Get text
+                let text = $(e).text();
+                // Regex for syllable header
+                let syllable_ReExp = /[1-9]{1,2} syllable/g;
+                //-Check for syllable match
+                if( text.match(syllable_ReExp) )
+                {
+                    let text_parts  = text.split(' ');
+                    syllable_no     = text_parts[0];
+
+                    //-Capitalise the header... must be a shorter way :|
+                    let syllable_header = text_parts[1].split(''); //syllable word array
+                    syllable_header.splice(0, 1, syllable_header[0].toUpperCase());
+                    syllable_header = syllable_header.join().replace(/,/g,'');
+
+                    //-Create Syllable header!
+                    let WORD_RHYME = new WordClass.Word_Rhyme();
+                    WORD_RHYME.Syllables = syllable_no;
+
+                    $log(`Rhyme---Syllable header::${syllable_no}-${syllable_header}`);
+                    resolve()
+                }
+                    
+            });
+
+
+        });
+
 
     });
 }

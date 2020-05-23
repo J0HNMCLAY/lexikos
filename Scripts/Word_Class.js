@@ -20,6 +20,8 @@ exports.Word = class {
         this.Examples  = [];
         this.Etymology = '';
         //
+        this.Rhymes = [];
+        //
         this.Off=false; //<-- DEBUG Use!
     }
     /**
@@ -125,6 +127,20 @@ exports.Example = class {
         this.Attribution = "";
     }
 }
+/**
+ * Word Rhyme
+ */
+exports.Word_Rhyme = class {
+    constructor ()
+    {
+        this.Rhyme = '';
+        this.Syllables = 0;
+    }
+}
+/**
+ * Syllable Rhyme
+ */
+
 
 exports.Etymology = class {
     constructor ()

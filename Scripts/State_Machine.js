@@ -35,17 +35,18 @@ exports.State_Machine = class
 exports.DebugController = class {
     constructor()
     {
-        this.Definitions = false;
-        this.Word_Forms  = false;
-        this.Pronunation = false;
-        this.Word_Class  = false;
-        this.Def_Table   = false;
-        this.Def_Examples= false;
-        this.Synonyms    = false;
-        this.Antonyms    = false;
-        this.Syn_Examples= false;
-        this.Syllables   = false;
-        this.Pronunation = false;
+        this.Definitions  = false;
+        this.Word_Forms   = false;
+        this.Pronunation  = false;
+        this.Word_Class   = false;
+        this.Def_Table    = false;
+        this.Def_Examples = false;
+        this.Synonyms     = false;
+        this.Antonyms     = false;
+        this.Syn_Examples = false;
+        this.Syllables    = false;
+        this.Pronunation  = false;
+        this.Related_Words= false;
     }
     Turn_All_On = (_OBJ) => 
     {
